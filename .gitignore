@@ -1,0 +1,34 @@
+# Terraform
+infra/backend.tf
+infra/*.tfvars
+infra/*.tfstate
+infra/*.tfstate.backup
+infra/.terraform/
+infra/crash.log
+
+# Keep the lock file — it pins provider versions
+!infra/.terraform.lock.hcl
+
+# AWS / secrets
+*.pem
+.env
+.env.local
+.env.*.local
+
+# Next.js
+apps/web/.next/
+apps/web/out/
+apps/web/node_modules/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.uv/
+
+# macOS
+.DS_Store
+
+# Internal / local-only docs
+internal_docs/
+action-plan.md

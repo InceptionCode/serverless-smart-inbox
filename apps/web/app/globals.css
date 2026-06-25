@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-base text-text;
+  }
+}
+
+@layer utilities {
+  .meter-sweep {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.07) 50%,
+      transparent 100%
+    );
+  }
+
+  .stream-scroll::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .stream-scroll::-webkit-scrollbar-track {
+    @apply bg-panel2;
+  }
+
+  .stream-scroll::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-line;
+  }
+}
