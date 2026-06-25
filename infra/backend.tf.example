@@ -1,0 +1,19 @@
+###############################################################################
+# backend.tf.example  —  Copy to backend.tf (gitignored) and fill in values.
+#
+# The state bucket and lock table are created once via the AWS CLI (Phase 1)
+# BEFORE running terraform init — Terraform can't manage its own backend.
+#
+# State bucket:  juice-tfstate-smart-inbox
+# Lock table:    juice-tflock-smart-inbox
+###############################################################################
+
+terraform {
+  backend "s3" {
+    bucket         = "REPLACE_WITH_STATE_BUCKET_NAME"   # e.g. juice-tfstate-smart-inbox
+    key            = "smart-inbox/terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "REPLACE_WITH_LOCK_TABLE_NAME"     # e.g. juice-tflock-smart-inbox
+    encrypt        = true
+  }
+}

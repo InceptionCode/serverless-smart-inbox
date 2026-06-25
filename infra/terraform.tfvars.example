@@ -1,0 +1,7 @@
+# terraform.tfvars.example  —  Copy to terraform.tfvars (gitignored).
+#
+# Both bucket names must be globally unique across all of AWS.
+# A safe pattern: <your-prefix>-smart-inbox-<suffix>
+
+inbox_bucket_name    = "REPLACE-smart-inbox-messages"   # e.g. juice-smart-inbox-messages
+frontend_bucket_name = "REPLACE-smart-inbox-frontend"   # e.g. juice-smart-inbox-frontend
