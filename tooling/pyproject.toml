@@ -1,0 +1,16 @@
+[project]
+name = "smart-inbox-tooling"
+version = "0.1.0"
+description = "Seeder and test utilities for the Serverless Smart Inbox."
+requires-python = ">=3.12"
+dependencies = [
+    "boto3>=1.35",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "ruff>=0.8",
+]
+
+[tool.ruff]
+line-length = 100

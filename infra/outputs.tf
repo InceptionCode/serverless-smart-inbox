@@ -6,10 +6,15 @@
 # Phase 8: frontend_bucket, dashboard_url
 ###############################################################################
 
-# output "inbox_bucket" {
-#   description = "Name of the S3 inbox bucket."
-#   value       = aws_s3_bucket.inbox.bucket
-# }
+output "inbox_bucket" {
+  description = "Name of the S3 inbox bucket."
+  value       = aws_s3_bucket.inbox.bucket
+}
+
+output "results_table" {
+  description = "Name of the DynamoDB results table."
+  value       = aws_dynamodb_table.results.name
+}
 
 # output "api_endpoint" {
 #   description = "Base URL for the API Gateway HTTP API (no trailing slash)."

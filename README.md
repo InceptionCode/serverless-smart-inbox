@@ -39,10 +39,10 @@ poison messages. Direct invocation gives you none of that.
 ## Repo layout
 
 ```
-apps/web/        Next.js dashboard (static export → S3 + CloudFront)
-functions/       Lambda source (Python) — processor + read_api   [handlers: YOU build]
-infra/           Terraform skeleton — resource bodies are TODOs   [YOU build]
-tooling/         Python seeder + sample messages (uv)
+apps/web/        Next.js dashboard (static export → S3 + CloudFront) [AI: built]
+handlers/       Lambda source (Python) — processor + read_api   [handlers: I built]
+infra/           Terraform skeleton — resource bodies are TODOs   [I built]
+tooling/         Python seeder + sample messages (uv) [Built by both: Me and AI]
 action-plan.md   Internal phase-by-phase build guide (gitignored)
 ```
 
@@ -71,7 +71,7 @@ can develop and demo the UI with zero backend.
 
 ## Deploy (you run this — from your machine, with your credentials)
 
-Full step-by-step lives in `action-plan.md`. The short version:
+Full step-by-step lives in `action-plan.md` (local untracked markdown). The short version:
 
 ```bash
 # 1. State backend (one-time): create an S3 state bucket + DynamoDB lock table,
