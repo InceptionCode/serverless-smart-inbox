@@ -21,8 +21,8 @@ Current state of the repo:
 
 - `apps/web/` — Next.js dashboard. COMPLETE and runnable (mock-data fallback).
 - `tooling/` — Python seeder + samples. COMPLETE.
-- `functions/processor/handler.py` — STUB. Build per its docstring + Phase 5.
-- `functions/read_api/handler.py` — STUB. Build per its docstring + Phase 7.
+- `handlers/processor/handler.py` — STUB. Build per its docstring + Phase 5.
+- `handlers/read_api/handler.py` — STUB. Build per its docstring + Phase 7.
 - `infra/*.tf` — SKELETON. Boilerplate done; resource bodies are commented TODOs.
 - CI/CD — not written yet. Phase 10. The human writes this; don't auto-generate it
   unless asked.
