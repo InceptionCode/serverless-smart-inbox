@@ -57,15 +57,7 @@ resource "aws_sqs_queue_policy" "ingest_from_s3" {
 }
 
 # --- Sentiment routing queues (Phase 6) -------------------------------------
-# Uncomment when building Phase 6. for_each keeps this DRY.
-#
-# resource "aws_sqs_queue" "routing" {
-#   for_each = toset(["positive", "negative", "neutral", "mixed"])
-#   name     = "${var.project_name}-route-${each.key}"
-# }
-#
-# Pass the URLs into the processor Lambda as env vars (see lambda.tf):
-#   QUEUE_URL_POSITIVE = aws_sqs_queue.routing["positive"].url
-#   QUEUE_URL_NEGATIVE = aws_sqs_queue.routing["negative"].url
-#   QUEUE_URL_NEUTRAL  = aws_sqs_queue.routing["neutral"].url
-#   QUEUE_URL_MIXED    = aws_sqs_queue.routing["mixed"].url
+resource "aws_sqs_queue" "routing" {
+  for_each = toset(["positive", "negative", "neutral", "mixed"])
+  name     = "${var.project_name}-route-${each.key}"
+}

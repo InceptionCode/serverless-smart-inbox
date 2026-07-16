@@ -1,0 +1,174 @@
+###############################################################################
+# Deploy — manually triggered only.
+#
+# This workflow NEVER runs automatically. Every deploy is a deliberate,
+# human-initiated action via the GitHub Actions UI ("Run workflow" button).
+#
+# What it does (in order):
+#   1. Verifies the confirmation input to prevent accidental triggers.
+#   2. Configures AWS credentials via OIDC (no long-lived keys in secrets).
+#   3. Writes terraform.tfvars from GitHub Secrets (never committed to git).
+#   4. terraform init → plan → apply  (backend + Lambda + API Gateway + CF)
+#   5. Captures Terraform outputs (API endpoint, bucket name, distribution ID).
+#   6. Builds the Next.js static export, injecting the real API endpoint.
+#   7. Syncs the built site to the S3 frontend bucket.
+#   8. Invalidates the CloudFront cache so visitors see the new build.
+#
+# Required GitHub Secrets (Settings → Secrets and variables → Actions):
+#   AWS_DEPLOY_ROLE_ARN    — ARN of the IAM role with OIDC trust for this repo
+#   TF_STATE_BUCKET        — S3 bucket holding terraform.tfstate
+#   TF_LOCK_TABLE          — DynamoDB table used for state locking
+#   TF_INBOX_BUCKET        — Globally unique S3 bucket for incoming messages
+#   TF_FRONTEND_BUCKET     — Globally unique S3 bucket for the dashboard
+#   TF_ALARM_EMAIL         — Email address for DLQ failure notifications
+#
+# One-time AWS setup (see runbook.md § Prerequisites):
+#   - Create the IAM OIDC provider for token.actions.githubusercontent.com
+#   - Create the deploy IAM role with the trust policy for this repo
+#   - Attach the least-privilege policy (see runbook.md § IAM deploy role)
+###############################################################################
+
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "deploy" to confirm. This will run terraform apply and update the live site.'
+        required: true
+        default: ""
+
+permissions:
+  id-token: write   # Required for OIDC token exchange
+  contents: read
+
+env:
+  TF_VERSION: "~1.7"
+  NODE_VERSION: "20"
+  PYTHON_VERSION: "3.12"
+  AWS_REGION: "us-east-1"
+
+jobs:
+  deploy:
+    name: Deploy to AWS
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      # ── 0. Gate: require explicit confirmation ──────────────────────────────
+      - name: Verify confirmation input
+        if: github.event.inputs.confirm != 'deploy'
+        run: |
+          echo "::error::Confirmation input must be exactly 'deploy'."
+          echo "::error::Got: '${{ github.event.inputs.confirm }}'"
+          exit 1
+
+      # ── 1. Source ───────────────────────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── 2. Tool setup ───────────────────────────────────────────────────────
+      - name: Setup Terraform ${{ env.TF_VERSION }}
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          # Wrap terraform output so raw values don't include debug lines.
+          terraform_wrapper: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+
+      # ── 3. AWS credentials via OIDC (no static keys) ────────────────────────
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # ── 4. Write Terraform tfvars from Secrets ──────────────────────────────
+      # terraform.tfvars is gitignored. We write it here from Secrets so that
+      # apply has all required variables without any file being committed.
+      - name: Write terraform.tfvars
+        run: |
+          cat > infra/terraform.tfvars <<EOF
+          inbox_bucket_name    = "${{ secrets.TF_INBOX_BUCKET }}"
+          frontend_bucket_name = "${{ secrets.TF_FRONTEND_BUCKET }}"
+          alarm_email          = "${{ secrets.TF_ALARM_EMAIL }}"
+          EOF
+
+      # ── 5. Terraform: init ──────────────────────────────────────────────────
+      - name: Terraform init
+        working-directory: infra
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="key=smart-inbox/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="dynamodb_table=${{ secrets.TF_LOCK_TABLE }}" \
+            -backend-config="encrypt=true"
+
+      # ── 6. Terraform: plan ──────────────────────────────────────────────────
+      # Plan is saved to a file so that apply executes exactly what was reviewed.
+      # The plan file is never uploaded — it is consumed in the next step only.
+      - name: Terraform plan
+        working-directory: infra
+        run: terraform plan -out=tfplan
+
+      # ── 7. Terraform: apply ─────────────────────────────────────────────────
+      - name: Terraform apply
+        working-directory: infra
+        run: terraform apply -auto-approve tfplan
+
+      # ── 8. Capture outputs ──────────────────────────────────────────────────
+      - name: Capture Terraform outputs
+        id: tf
+        working-directory: infra
+        run: |
+          echo "api_endpoint=$(terraform output -raw api_endpoint)"            >> $GITHUB_OUTPUT
+          echo "frontend_bucket=$(terraform output -raw frontend_bucket)"      >> $GITHUB_OUTPUT
+          echo "cf_dist_id=$(terraform output -raw cloudfront_distribution_id)" >> $GITHUB_OUTPUT
+
+      # ── 9. Build frontend ───────────────────────────────────────────────────
+      - name: Install frontend dependencies
+        working-directory: apps/web
+        run: pnpm install --frozen-lockfile
+
+      - name: Build static export
+        working-directory: apps/web
+        env:
+          NEXT_PUBLIC_API_URL: ${{ steps.tf.outputs.api_endpoint }}
+        run: pnpm run build
+        # Output lands in apps/web/out/ (next.config.ts: output: "export")
+
+      # ── 10. Deploy: S3 sync ─────────────────────────────────────────────────
+      - name: Sync to S3
+        run: |
+          aws s3 sync apps/web/out/ \
+            "s3://${{ steps.tf.outputs.frontend_bucket }}" \
+            --delete \
+            --cache-control "public,max-age=31536000,immutable" \
+            --exclude "*.html" \
+            --exclude "*.json"
+          # HTML and JSON get short cache so refreshes pick up new deployments.
+          aws s3 sync apps/web/out/ \
+            "s3://${{ steps.tf.outputs.frontend_bucket }}" \
+            --delete \
+            --cache-control "public,max-age=0,must-revalidate" \
+            --include "*.html" \
+            --include "*.json"
+
+      # ── 11. Invalidate CloudFront cache ─────────────────────────────────────
+      - name: Invalidate CloudFront
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ steps.tf.outputs.cf_dist_id }}" \
+            --paths "/*"

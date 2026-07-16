@@ -1,18 +1,15 @@
 ###############################################################################
-# Lambda  —  Phase 5.  Processor function + SQS event source mapping.
+# Lambda  —  Phase 5 (processor) + Phase 7 (read_api).
 #
 # Packaging: the handler directory is zipped on-the-fly by Terraform using
 # the archive_file data source.  boto3/botocore ship with the Lambda managed
 # runtime (python3.12) — no extra layer needed.
 #
-# ESM notes:
+# ESM notes (processor only):
 #   batch_size = 10          — process up to 10 S3 notifications per invocation.
 #   function_response_types  — "ReportBatchItemFailures" lets the handler return
 #                              { batchItemFailures: [...] } so only failed records
 #                              go back to the queue, not the whole batch.
-#   bisect_batch_on_function_error = true — if the Lambda itself throws (not a
-#                              per-record error), SQS bisects the batch to narrow
-#                              down the poison message automatically.
 ###############################################################################
 
 # ---------------------------------------------------------------------------
@@ -82,4 +79,41 @@ resource "aws_lambda_event_source_mapping" "ingest" {
   batch_size                         = 10
   maximum_batching_window_in_seconds = 5
   function_response_types            = ["ReportBatchItemFailures"]
+}
+
+# ===========================================================================
+# Phase 7 — Read API Lambda
+# ===========================================================================
+
+data "archive_file" "read_api" {
+  type        = "zip"
+  source_dir  = "${path.module}/../handlers/read_api"
+  output_path = "${path.module}/.terraform/read_api.zip"
+}
+
+resource "aws_cloudwatch_log_group" "read_api" {
+  name              = "/aws/lambda/${var.project_name}-read-api"
+  retention_in_days = 30
+}
+
+resource "aws_lambda_function" "read_api" {
+  function_name = "${var.project_name}-read-api"
+  description   = "Returns scored messages from DynamoDB for the dashboard."
+
+  filename         = data.archive_file.read_api.output_path
+  source_code_hash = data.archive_file.read_api.output_base64sha256
+  runtime          = "python3.12"
+  handler          = "handler.handler"
+
+  role        = aws_iam_role.read_api.arn
+  timeout     = 10
+  memory_size = 128
+
+  environment {
+    variables = {
+      RESULTS_TABLE = aws_dynamodb_table.results.name
+    }
+  }
+
+  depends_on = [aws_cloudwatch_log_group.read_api]
 }

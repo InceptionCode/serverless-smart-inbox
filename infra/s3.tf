@@ -35,21 +35,20 @@ resource "aws_s3_bucket_notification" "inbox" {
 }
 
 # --- Frontend bucket (Phase 8) -----------------------------------------------
-# Uncomment when building Phase 8. This bucket serves the Next.js static
-# export via CloudFront with an Origin Access Control (OAC) policy.
-#
-# resource "aws_s3_bucket" "frontend" {
-#   bucket = var.frontend_bucket_name
-# }
-#
-# resource "aws_s3_bucket_public_access_block" "frontend" {
-#   bucket = aws_s3_bucket.frontend.id
-#
-#   block_public_acls       = true
-#   block_public_policy     = true
-#   ignore_public_acls      = true
-#   restrict_public_buckets = true
-# }
-#
-# The OAC bucket policy that grants CloudFront read access is added in
-# cloudfront.tf once the distribution ARN is known.
+# Serves the Next.js static export via CloudFront with OAC.
+# The bucket itself stays fully private — CloudFront is the only reader.
+
+resource "aws_s3_bucket" "frontend" {
+  bucket = var.frontend_bucket_name
+}
+
+resource "aws_s3_bucket_public_access_block" "frontend" {
+  bucket = aws_s3_bucket.frontend.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# OAC bucket policy lives in cloudfront.tf (needs the distribution ARN).

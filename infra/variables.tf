@@ -26,3 +26,8 @@ variable "frontend_bucket_name" {
   description = "Globally unique S3 bucket name for the CloudFront-served dashboard."
   type        = string
 }
+
+variable "alarm_email" {
+  description = "Email address to notify when the ingest DLQ receives a failed message."
+  type        = string
+}

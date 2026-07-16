@@ -16,17 +16,22 @@ output "results_table" {
   value       = aws_dynamodb_table.results.name
 }
 
-# output "api_endpoint" {
-#   description = "Base URL for the API Gateway HTTP API (no trailing slash)."
-#   value       = aws_apigatewayv2_api.read_api.api_endpoint
-# }
+output "api_endpoint" {
+  description = "Base URL for the API Gateway HTTP API (no trailing slash)."
+  value       = aws_apigatewayv2_api.read_api.api_endpoint
+}
 
-# output "frontend_bucket" {
-#   description = "Name of the CloudFront frontend S3 bucket."
-#   value       = aws_s3_bucket.frontend.bucket
-# }
+output "frontend_bucket" {
+  description = "Name of the CloudFront frontend S3 bucket."
+  value       = aws_s3_bucket.frontend.bucket
+}
 
-# output "dashboard_url" {
-#   description = "HTTPS URL of the live dashboard via CloudFront."
-#   value       = "https://${aws_cloudfront_distribution.frontend.domain_name}"
-# }
+output "dashboard_url" {
+  description = "HTTPS URL of the live dashboard via CloudFront."
+  value       = "https://${aws_cloudfront_distribution.frontend.domain_name}"
+}
+
+output "cloudfront_distribution_id" {
+  description = "CloudFront distribution ID — used by the deploy workflow to issue cache invalidations."
+  value       = aws_cloudfront_distribution.frontend.id
+}
