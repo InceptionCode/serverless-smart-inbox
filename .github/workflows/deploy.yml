@@ -94,9 +94,25 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # ── 4. Write Terraform tfvars from Secrets ──────────────────────────────
-      # terraform.tfvars is gitignored. We write it here from Secrets so that
-      # apply has all required variables without any file being committed.
+      # ── 4. Write gitignored Terraform config files from Secrets ────────────
+      # backend.tf and terraform.tfvars are gitignored (they contain real names
+      # and bucket references). We regenerate them here from Secrets so that
+      # terraform init connects to the real remote state and apply has all
+      # required variable values — nothing sensitive is ever committed to git.
+      - name: Write backend.tf
+        run: |
+          cat > infra/backend.tf <<EOF
+          terraform {
+            backend "s3" {
+              bucket         = "${{ secrets.TF_STATE_BUCKET }}"
+              key            = "smart-inbox/terraform.tfstate"
+              region         = "${{ env.AWS_REGION }}"
+              dynamodb_table = "${{ secrets.TF_LOCK_TABLE }}"
+              encrypt        = true
+            }
+          }
+          EOF
+
       - name: Write terraform.tfvars
         run: |
           cat > infra/terraform.tfvars <<EOF
@@ -108,13 +124,7 @@ jobs:
       # ── 5. Terraform: init ──────────────────────────────────────────────────
       - name: Terraform init
         working-directory: infra
-        run: |
-          terraform init \
-            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
-            -backend-config="key=smart-inbox/terraform.tfstate" \
-            -backend-config="region=${{ env.AWS_REGION }}" \
-            -backend-config="dynamodb_table=${{ secrets.TF_LOCK_TABLE }}" \
-            -backend-config="encrypt=true"
+        run: terraform init
 
       # ── 6. Terraform: plan ──────────────────────────────────────────────────
       # Plan is saved to a file so that apply executes exactly what was reviewed.
