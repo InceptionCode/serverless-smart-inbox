@@ -1,15 +1,3 @@
-###############################################################################
-# CI — runs on every push to main and every pull request.
-#
-# Jobs:
-#   web    — pnpm install → lint → typecheck → test → build
-#   infra  — terraform fmt -check → init -backend=false → validate
-#   python — ruff check → py_compile on all handler modules
-#
-# No AWS credentials are needed here. Terraform runs with -backend=false
-# so the remote state bucket is never touched. Deploy is a separate workflow.
-###############################################################################
-
 name: CI
 
 on:
@@ -19,9 +7,6 @@ on:
   pull_request:
 
 jobs:
-  # ---------------------------------------------------------------------------
-  # Frontend — Next.js 15 (static export), pnpm, vitest
-  # ---------------------------------------------------------------------------
   web:
     name: Frontend — lint / typecheck / test / build
     runs-on: ubuntu-latest
@@ -56,16 +41,9 @@ jobs:
 
       - name: Unit tests
         run: pnpm run test:run
-
-      # Build last — catches output-mode issues and env-var misconfigurations.
-      # NEXT_PUBLIC_API_URL is intentionally left unset here; the build must
-      # succeed without it (dashboard falls back to demo data when undefined).
       - name: Build (static export)
         run: pnpm run build
 
-  # ---------------------------------------------------------------------------
-  # Infrastructure — Terraform format + validate (no backend, no AWS access)
-  # ---------------------------------------------------------------------------
   infra:
     name: Infra — fmt / validate
     runs-on: ubuntu-latest
@@ -93,9 +71,6 @@ jobs:
       - name: Validate
         run: terraform validate
 
-  # ---------------------------------------------------------------------------
-  # Python — ruff lint + compile check on all handler modules + tooling
-  # ---------------------------------------------------------------------------
   python:
     name: Python — ruff / compile
     runs-on: ubuntu-latest
